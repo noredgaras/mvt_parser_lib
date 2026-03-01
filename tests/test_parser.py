@@ -1,4 +1,3 @@
-import pytest
 from mvt_parser import MVTParser, MVTParseError
 
 def test_basic_parse():
