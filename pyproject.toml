@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mvt-parser"
+version = "0.1.0"
+description = "Python library to parse OAG/IATA MVT flight movement messages"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [
+  { name = "Your Name", email = "you@example.com" }
+]
+license = { text = "MIT" }
+keywords = ["aviation", "flights", "mvt", "parser", "iata", "oag"]
+
+[tool.setuptools.packages.find]
+where = ["."]
