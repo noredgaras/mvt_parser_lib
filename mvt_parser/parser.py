@@ -12,21 +12,25 @@ class MVTParser:
         if not lines:
             raise MVTParseError("Empty message")
 
-        msg, *rest = lines
-        hm = self.HEADER.match(msg)
+        # Header
+        header_line, *rest = lines
+        hm = self.HEADER.match(header_line)
         if not hm:
             raise MVTParseError("Invalid header")
         mtype, flag = hm.groups()
         is_corr = flag == "COR"
         is_rev = flag == "REV"
 
+        # Flight line
+        if not rest:
+            raise MVTParseError("Missing flight line")
         flight_line = rest.pop(0)
         fm = self.FLIGHT.match(flight_line)
         if not fm:
             raise MVTParseError("Invalid flight line")
         flight_no, sched_day, ac_reg, apt = fm.groups()
 
-        m = MVTMessage(
+        msg = MVTMessage(
             message_type=mtype,
             is_correction=is_corr,
             is_revision=is_rev,
@@ -36,11 +40,45 @@ class MVTParser:
             airport_of_movement=apt
         )
 
+        # Parse remaining lines
         for line in rest:
-            self._parse_line(line, m)
-        return m
+            self._parse_line(line, msg)
 
+        return msg
+    
     def _parse_line(self, line: str, m: MVTMessage):
+        # Line-based tokens
+        if line.startswith("SI"):
+            m.supplementary_info.append(line[2:].strip())
+            return
+
+        if line.startswith("DR"):
+            parts = line[2:].strip().split()
+            m.diversion_reason = parts[0] if parts else None
+            if len(parts) > 1 and parts[1].startswith("PX"):
+                m.passenger_info = self._parse_passenger(parts[1][2:])
+            return
+
+        if line.startswith("FR"):
+            parts = line[2:].strip().split()
+            m.return_from_airborne = parts[0] if parts else None
+            if len(parts) > 1 and parts[1].startswith("PX"):
+                m.passenger_info = self._parse_passenger(parts[1][2:])
+            return
+
+        if line.startswith("PX"):
+            m.passenger_info = self._parse_passenger(line[2:].strip())
+            return
+
+        if line.startswith("DL"):
+            m.delays.append(self._parse_delay(line[2:].strip()))
+            return
+
+        if line.startswith("NI"):
+            m.next_info = line[2:].strip()
+            return
+
+        # Remaining tokens split by space
         tokens = line.split()
         for token in tokens:
             if token.startswith("AD"):
@@ -53,12 +91,6 @@ class MVTParser:
                 m.estimated_arrival = token[2:]
             elif token.startswith("EB"):
                 m.estimated_onblock = token[2:]
-            elif token.startswith("DL"):
-                m.delays.append(self._parse_delay(token[2:]))
-            elif token.startswith("NI"):
-                m.next_info = token[2:]
-            elif token.startswith("PX"):
-                m.passenger_info = self._parse_passenger(token[2:])
             elif token.startswith("RC"):
                 m.reclearance = token[2:]
             elif token.startswith("FLD"):
@@ -82,7 +114,7 @@ class MVTParser:
 
     def _parse_delay(self, val: str) -> Delay:
         parts = val.split("/")
-        codes = [parts[0]] if len(parts) >= 1 else []
+        codes = [parts[0]] if parts else []
         durations = parts[1:] if len(parts) > 1 else []
         return Delay(reason_codes=codes, durations=durations)
 
