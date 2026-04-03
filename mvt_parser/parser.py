@@ -1,7 +1,8 @@
 import re
 from typing import Optional
-from .models import MVTMessage, MovementTime, Delay, PassengerInfo, FlightLeg
+
 from .exceptions import MVTParseError
+from .models import Delay, FlightLeg, MovementTime, MVTMessage, PassengerInfo
 
 _TIME_RE = re.compile(r'^\d{4}$|^\d{6}$')
 _IATA_RE = re.compile(r'^[A-Z]{3}$')

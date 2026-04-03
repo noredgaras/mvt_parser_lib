@@ -1,6 +1,13 @@
 import json
+
 import pytest
-from mvt_parser import MVTParser, MVTMessage, MovementTime, Delay, PassengerInfo, FlightLeg, MVTParseError
+
+from mvt_parser import (
+    MovementTime,
+    MVTParseError,
+    MVTParser,
+)
+
 
 # --- Helper ---
 def parse_msg(raw):
