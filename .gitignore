@@ -83,3 +83,12 @@ $RECYCLE.BIN/
 
 # WSL
 *.swap
+
+# Claude Code
+.claude/
+
+# mypy
+.mypy_cache/
+
+# ruff / linting
+.ruff_cache/

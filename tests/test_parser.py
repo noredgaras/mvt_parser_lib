@@ -90,7 +90,7 @@ def test_return_from_airborne():
     SI ENGINE TROUBLE
     """
     msg = parse_msg(raw)
-    assert msg.return_from_airborne == "1200/1215"
+    assert msg.return_from_airborne == MovementTime(primary="1200", secondary="1215")
     assert msg.passenger_info.total == 112
     assert "ENGINE TROUBLE" in msg.supplementary_info[0]
 
@@ -165,7 +165,7 @@ def test_unknown_tokens():
     """
     msg = parse_msg(raw)
     assert "XY999" in msg.unknown_lines
-    assert "ABC" in msg.unknown_lines
+    assert msg.destination_airport == "ABC"
 
 # --- 12. Invalid Header Throws Error ---
 def test_invalid_message_raises():
