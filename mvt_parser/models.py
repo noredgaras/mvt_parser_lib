@@ -1,15 +1,19 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from typing import Optional, List
+import json
+
 
 @dataclass
 class Delay:
     reason_codes: List[str]
     durations: List[str]
 
+
 @dataclass
 class PassengerInfo:
     total: int
     infants: Optional[int] = None
+
 
 @dataclass
 class MovementTime:
@@ -18,6 +22,16 @@ class MovementTime:
 
     def __str__(self) -> str:
         return f"{self.primary}/{self.secondary}" if self.secondary else self.primary
+
+
+@dataclass
+class FlightLeg:
+    actual_departure: Optional[MovementTime] = None
+    actual_arrival: Optional[MovementTime] = None
+    estimated_departure: Optional[str] = None
+    estimated_arrival: Optional[str] = None
+    destination: Optional[str] = None
+
 
 @dataclass
 class MVTMessage:
@@ -38,6 +52,9 @@ class MVTMessage:
     estimated_departure: Optional[str] = None
     estimated_arrival: Optional[str] = None
     estimated_onblock: Optional[str] = None
+
+    # Flight legs (populated for multi-leg messages; first leg also sets primary time fields)
+    legs: List[FlightLeg] = field(default_factory=list)
 
     # Delays & supplementary
     delays: List[Delay] = field(default_factory=list)
@@ -64,6 +81,12 @@ class MVTMessage:
     # Unknown/unhandled lines
     unknown_lines: List[str] = field(default_factory=list)
 
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+    def to_json(self) -> str:
+        return json.dumps(self.to_dict(), indent=2)
+
     def __str__(self) -> str:
         flag = " COR" if self.is_correction else (" REV" if self.is_revision else "")
         header = f"[{self.message_type}{flag}] {self.flight_number}/{self.scheduled_day}"
@@ -72,17 +95,33 @@ class MVTMessage:
         if self.airport_of_movement:
             header += f".{self.airport_of_movement}"
         parts = [header]
-        if self.actual_departure:
-            parts.append(f"  AD: {self.actual_departure}")
-        if self.actual_arrival:
-            parts.append(f"  AA: {self.actual_arrival}")
-        if self.estimated_departure:
-            parts.append(f"  ED: {self.estimated_departure}")
-        if self.estimated_arrival:
-            parts.append(f"  EA: {self.estimated_arrival}")
+        if self.legs:
+            for i, leg in enumerate(self.legs, 1):
+                leg_parts = []
+                if leg.actual_departure:
+                    leg_parts.append(f"AD:{leg.actual_departure}")
+                if leg.actual_arrival:
+                    leg_parts.append(f"AA:{leg.actual_arrival}")
+                if leg.estimated_departure:
+                    leg_parts.append(f"ED:{leg.estimated_departure}")
+                if leg.estimated_arrival:
+                    leg_parts.append(f"EA:{leg.estimated_arrival}")
+                if leg.destination:
+                    leg_parts.append(f"→{leg.destination}")
+                if leg_parts:
+                    parts.append(f"  Leg {i}: {' '.join(leg_parts)}")
+        else:
+            if self.actual_departure:
+                parts.append(f"  AD: {self.actual_departure}")
+            if self.actual_arrival:
+                parts.append(f"  AA: {self.actual_arrival}")
+            if self.estimated_departure:
+                parts.append(f"  ED: {self.estimated_departure}")
+            if self.estimated_arrival:
+                parts.append(f"  EA: {self.estimated_arrival}")
         if self.estimated_onblock:
             parts.append(f"  EB: {self.estimated_onblock}")
-        if self.destination_airport:
+        if self.destination_airport and not self.legs:
             parts.append(f"  Destination: {self.destination_airport}")
         for d in self.delays:
             parts.append(f"  DL: codes={d.reason_codes} durations={d.durations}")

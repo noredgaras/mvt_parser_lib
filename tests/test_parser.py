@@ -1,5 +1,6 @@
+import json
 import pytest
-from mvt_parser import MVTParser, MVTMessage, MovementTime, Delay, PassengerInfo, MVTParseError
+from mvt_parser import MVTParser, MVTMessage, MovementTime, Delay, PassengerInfo, FlightLeg, MVTParseError
 
 # --- Helper ---
 def parse_msg(raw):
@@ -156,7 +157,7 @@ def test_flight_ops_tokens():
     assert msg.takeoff_weight == 70000
     assert msg.zero_fuel_weight == 60000
 
-# --- 11. Unknown tokens go to unknown_lines ---
+# --- 11. Unknown tokens go to unknown_lines; 3-letter codes go to destination_airport ---
 def test_unknown_tokens():
     raw = """
     MVT
@@ -182,3 +183,95 @@ def test_empty_message_raises():
     parser = MVTParser()
     with pytest.raises(MVTParseError):
         parser.parse("")
+
+# --- 14. MVA Message Type ---
+def test_mva_message():
+    raw = """
+    MVA
+    BA200/15.XYZAB.LHR
+    EA1430
+    EB1445
+    """
+    msg = parse_msg(raw)
+    assert msg.message_type == "MVA"
+    assert msg.flight_number == "BA200"
+    assert msg.estimated_arrival == "1430"
+    assert msg.estimated_onblock == "1445"
+
+# --- 15. Multi-leg Message ---
+def test_multi_leg_message():
+    raw = """
+    MVT
+    BA100/27.PPVMU.LHR
+    AD1200/1210 EA1300 CDG
+    AD1400/1415 EA1600 FRA
+    """
+    msg = parse_msg(raw)
+    assert len(msg.legs) == 2
+    assert msg.legs[0].actual_departure == MovementTime(primary="1200", secondary="1210")
+    assert msg.legs[0].estimated_arrival == "1300"
+    assert msg.legs[0].destination == "CDG"
+    assert msg.legs[1].actual_departure == MovementTime(primary="1400", secondary="1415")
+    assert msg.legs[1].estimated_arrival == "1600"
+    assert msg.legs[1].destination == "FRA"
+    # Primary fields capture first occurrence
+    assert msg.actual_departure == MovementTime(primary="1200", secondary="1210")
+
+# --- 16. Bad time format raises MVTParseError ---
+def test_bad_time_format_raises():
+    raw = """
+    MVT
+    SD200/22.PMDFG.CDG
+    ED9999999
+    """
+    parser = MVTParser()
+    with pytest.raises(MVTParseError, match="Invalid time format"):
+        parser.parse(raw)
+
+# --- 17. Bad numeric value raises MVTParseError ---
+def test_bad_numeric_raises():
+    raw = """
+    MVT
+    SD200/22.PMDFG.CDG
+    TOFABC
+    """
+    parser = MVTParser()
+    with pytest.raises(MVTParseError, match="Invalid takeoff fuel"):
+        parser.parse(raw)
+
+# --- 18. Invalid scheduled day raises MVTParseError ---
+def test_invalid_day_raises():
+    raw = """
+    MVT
+    SD200/00.PMDFG.CDG
+    """
+    parser = MVTParser()
+    with pytest.raises(MVTParseError, match="Invalid scheduled day"):
+        parser.parse(raw)
+
+# --- 19. to_dict returns correct structure ---
+def test_to_dict():
+    raw = """
+    MVT
+    SD200/21.PMDFG.CDG
+    AD1100/1115 EA1500 FRA
+    PX112
+    """
+    msg = parse_msg(raw)
+    d = msg.to_dict()
+    assert d["flight_number"] == "SD200"
+    assert d["actual_departure"] == {"primary": "1100", "secondary": "1115"}
+    assert d["passenger_info"] == {"total": 112, "infants": None}
+
+# --- 20. to_json returns valid JSON ---
+def test_to_json():
+    raw = """
+    MVT
+    SD200/21.PMDFG.CDG
+    AD1100/1115
+    """
+    msg = parse_msg(raw)
+    result = json.loads(msg.to_json())
+    assert result["message_type"] == "MVT"
+    assert result["flight_number"] == "SD200"
+    assert result["actual_departure"] == {"primary": "1100", "secondary": "1115"}

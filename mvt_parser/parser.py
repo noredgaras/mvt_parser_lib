@@ -1,5 +1,6 @@
 import re
-from .models import MVTMessage, MovementTime, Delay, PassengerInfo
+from typing import Optional
+from .models import MVTMessage, MovementTime, Delay, PassengerInfo, FlightLeg
 from .exceptions import MVTParseError
 
 _TIME_RE = re.compile(r'^\d{4}$|^\d{6}$')
@@ -85,19 +86,35 @@ class MVTParser:
             return
 
         tokens = line.split()
+        current_leg: Optional[FlightLeg] = None
         for token in tokens:
             if token.startswith("AD"):
-                m.actual_departure = self._get_movement(token[2:])
+                mt = self._get_movement(token[2:])
+                if m.actual_departure is None:
+                    m.actual_departure = mt
+                current_leg = FlightLeg(actual_departure=mt)
+                m.legs.append(current_leg)
             elif token.startswith("AA"):
-                m.actual_arrival = self._get_movement(token[2:])
+                mt = self._get_movement(token[2:])
+                if m.actual_arrival is None:
+                    m.actual_arrival = mt
+                if current_leg is None:
+                    current_leg = FlightLeg(actual_arrival=mt)
+                    m.legs.append(current_leg)
+                else:
+                    current_leg.actual_arrival = mt
             elif token.startswith("ED"):
                 val = token[2:]
                 self._validate_time(val, "ED")
                 m.estimated_departure = val
+                if current_leg:
+                    current_leg.estimated_departure = val
             elif token.startswith("EA"):
                 val = token[2:]
                 self._validate_time(val, "EA")
                 m.estimated_arrival = val
+                if current_leg:
+                    current_leg.estimated_arrival = val
             elif token.startswith("EB"):
                 val = token[2:]
                 self._validate_time(val, "EB")
@@ -127,6 +144,8 @@ class MVTParser:
                     raise MVTParseError(f"Invalid zero fuel weight value: {token[3:]!r}")
             elif _IATA_RE.match(token):
                 m.destination_airport = token
+                if current_leg:
+                    current_leg.destination = token
             else:
                 m.unknown_lines.append(token)
 
