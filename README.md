@@ -1,6 +1,6 @@
 # mvt-parser
 
-Python library for parsing OAG/IATA MVT flight movement messages.
+Python library for parsing IATA MVT flight movement messages.
 
 ## Install
 

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mvt-parser"
 version = "0.1.0"
-description = "Python library to parse OAG/IATA MVT flight movement messages"
+description = "Python library to parse IATA MVT flight movement messages"
 readme = "README.md"
 requires-python = ">=3.9"
 authors = [{ name = "Edgaras Norvaisa" }]
