@@ -1,130 +1,114 @@
-# MVT Parser Library
+# mvt-parser
 
-**Python library to parse OAG/IATA MVT (Movement) flight messages.**
+Python library for parsing OAG/IATA MVT flight movement messages.
 
-`mvt_parser_lib` allows you to read and interpret MVT/MVA/DIV flight movement messages, extract flight details, delays, passenger info, and all relevant expressions defined in the OAG standard.
-
----
-
-## Features
-
-* Parse **MVT, MVA, DIV** messages.
-* Extract flight identification, scheduled/actual/estimated times.
-* Parse **delays, passenger counts, reclearance, fuel, weights**, and other expressions.
-* Handles **corrections (COR) and revisions (REV)**.
-* Easy-to-use Python API.
-* Ready for **unit testing, CI/CD, and PyPI deployment**.
-
----
-
-## Installation
-
-Recommended: use a virtual environment:
+## Install
 
 ```bash
-# Navigate to project folder
-cd mvt_parser_lib
-
-# Create a virtual environment
-python -m venv venv
-
-# Activate the virtual environment
-# On Windows:
-venv\Scripts\activate
-# On macOS/Linux:
-# source venv/bin/activate
-
-# Install locally in editable mode
-python -m pip install -e .
-
-# For development/testing, install pytest
-python -m pip install pytest
+pip install mvt-parser
 ```
 
----
-
-## Testing
-
-Run the test suite:
-
-```bash
-python -m pytest tests/
-```
-
-## Usage
+## Quick start
 
 ```python
 from mvt_parser import MVTParser
 
-raw_msg = """
-MVT
-BA100/27.PPVMU.LTN
-AD1200/1210 EA1300 CDG
-DL72/0015/0020
-PX145/12
-RC0945 LHR
-FLD27
-CRT0800
-TOF6400
-"""
-
 parser = MVTParser()
-msg = parser.parse(raw_msg)
+msg = parser.parse("""
+MVT
+BA100/27.PPVMU.LHR
+AD1200/1210 EA1300 CDG
+DL72/0015
+PX145/12
+SI DEICING
+""")
 
-# Access parsed data
 print(msg.flight_number)          # BA100
-print(msg.actual_departure)       # MovementTime(primary='1200', secondary='1210')
+print(msg.actual_departure)       # 1200/1210
+print(msg.estimated_arrival)      # 1300
+print(msg.delays[0].reason_codes) # ['72']
 print(msg.passenger_info.total)   # 145
 ```
 
----
+## Supported message types
 
-## Available Parsed Fields
+| Type | Description |
+|------|-------------|
+| `MVT` | Movement — actual departure or arrival |
+| `MVA` | Movement Advice — estimated time update |
+| `DIV` | Diversion — flight redirected to another airport |
 
-* **Flight Info:** `flight_number`, `scheduled_day`, `aircraft_registration`, `airport_of_movement`
-* **Times:** `actual_departure`, `actual_arrival`, `estimated_departure`, `estimated_arrival`, `estimated_onblock`
-* **Delays:** `delays` (reason codes and durations)
-* **Passenger Info:** `passenger_info` (total passengers, infants)
-* **Reclearance:** `reclearance`
-* **Flight Leg / Crew:** `flight_leg_date`, `crew_report_time`
-* **Aircraft Weights / Fuel:** `takeoff_fuel`, `takeoff_weight`, `zero_fuel_weight`
-* **Other / Unknown lines:** `unknown_lines`
+All three support optional `COR` (correction) and `REV` (revision) flags.
 
----
+## Parsed fields
 
-## Testing
+```python
+msg.flight_number           # "BA100"
+msg.scheduled_day           # "27"
+msg.aircraft_registration   # "PPVMU"
+msg.airport_of_movement     # "LHR"
+msg.is_correction           # False
+msg.is_revision             # False
 
-Run unit tests with **pytest**:
+msg.actual_departure        # MovementTime(primary="1200", secondary="1210")
+msg.actual_arrival          # MovementTime(primary="1515", secondary=None)
+msg.estimated_departure     # "1100"
+msg.estimated_arrival       # "1300"
+msg.estimated_onblock       # "1320"
 
-```bash
-# Make sure virtual environment is activated
-pytest tests
+msg.delays                  # [Delay(reason_codes=["72"], durations=["0015"])]
+msg.passenger_info          # PassengerInfo(total=145, infants=12)
+msg.destination_airport     # "CDG"
+msg.reclearance             # "LHR"
+
+msg.takeoff_fuel            # 6400
+msg.takeoff_weight          # 70000
+msg.zero_fuel_weight        # 60000
+
+msg.diversion_reason        # "71"
+msg.return_from_airborne    # MovementTime(primary="1400", secondary="1420")
+msg.supplementary_info      # ["DEICING"]
+msg.next_info               # "221150"
 ```
 
----
+## Multi-leg flights
 
-## Development
+When a message contains multiple departure lines each line is captured as a `FlightLeg`:
 
-* Use `pip install -e .` for editable mode while developing.
-* Run examples in `examples/run_parser.py`.
-* Ensure `.gitignore` excludes virtual environments, build artifacts, and IDE files.
+```python
+msg = parser.parse("""
+MVT
+BA100/27.PPVMU.LHR
+AD1200/1210 EA1300 CDG
+AD1400/1415 EA1600 FRA
+""")
 
----
+for leg in msg.legs:
+    print(leg.actual_departure, "->", leg.destination)
+# 1200/1210 -> CDG
+# 1400/1415 -> FRA
+```
 
-## Contribution
+## Export to dict / JSON
 
-* Fork the repo and create a branch for your feature.
-* Write **unit tests** for any new functionality.
-* Submit a **pull request** with clear description and examples.
+```python
+msg.to_dict()  # plain Python dict
+msg.to_json()  # pretty-printed JSON string
+```
 
----
+## Error handling
+
+All parse failures raise `MVTParseError`:
+
+```python
+from mvt_parser import MVTParser, MVTParseError
+
+try:
+    msg = parser.parse(raw)
+except MVTParseError as e:
+    print(f"Invalid message: {e}")
+```
 
 ## License
 
-This project is licensed under the **MIT License**. See `LICENSE` for details.
-
----
-
-## References
-
-* [OAG MVT/MVA/DIV Message Types and Examples](https://www.oag.com/hubfs/Inbound-Services/OAG-MVT-MVA-DIV-Message-Types-and-Examples.pdf)
+MIT
