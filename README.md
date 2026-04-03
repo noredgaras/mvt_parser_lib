@@ -111,7 +111,8 @@ msg.estimated_onblock       # "1320"
 msg.delays                  # [Delay(reason_codes=["72"], durations=["0015"])]
 msg.passenger_info          # PassengerInfo(total=145, infants=12)
 msg.destination_airport     # "CDG"
-msg.reclearance             # "LHR"
+msg.reclearance             # "0945"
+msg.reclearance_airport     # "LHR"
 
 msg.takeoff_fuel            # 6400
 msg.takeoff_weight          # 70000
@@ -140,6 +141,32 @@ for leg in msg.legs:
 # 1200/1210 -> CDG
 # 1400/1415 -> FRA
 ```
+
+## Serialize back to MVT
+
+`to_mvt()` reconstructs the original wire format from parsed data — useful for forwarding or storing messages:
+
+```python
+msg = parser.parse(raw)
+
+# modify a field
+msg.estimated_arrival = "1400"
+
+# serialize back
+print(msg.to_mvt())
+```
+
+Output:
+```
+MVT
+BA100/27.PPVMU.LHR
+AD1200/1210 EA1400 CDG
+DL72/0015
+PX145/12
+SI DEICING
+```
+
+The result is always valid and parseable back by `MVTParser`.
 
 ## Export to dict / JSON
 
