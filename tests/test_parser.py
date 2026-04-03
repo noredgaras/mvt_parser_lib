@@ -760,3 +760,155 @@ def test_invalid_flight_number():
     parser = MVTParser()
     with pytest.raises(MVTParseError, match="Invalid flight line"):
         parser.parse(raw)
+
+# --- Round-trip tests (parse → to_mvt → parse) ---
+
+def roundtrip(raw):
+    parser = MVTParser()
+    msg = parser.parse(raw)
+    return parser.parse(msg.to_mvt())
+
+def test_roundtrip_departure():
+    raw = """
+    MVT
+    SD200/21.PMDFG.CDG
+    AD1100/1115 EA1500 FRA
+    DL72/0015
+    PX112/3
+    SI DEICING
+    """
+    original = parse_msg(raw)
+    rt = roundtrip(raw)
+    assert rt.flight_number == original.flight_number
+    assert rt.actual_departure == original.actual_departure
+    assert rt.estimated_arrival == original.estimated_arrival
+    assert rt.delays[0].reason_codes == original.delays[0].reason_codes
+    assert rt.passenger_info.total == original.passenger_info.total
+    assert rt.supplementary_info == original.supplementary_info
+
+def test_roundtrip_arrival():
+    raw = """
+    MVT
+    SD200/22.PMDFG.FRA
+    AA1515/1520
+    FLD22
+    """
+    original = parse_msg(raw)
+    rt = roundtrip(raw)
+    assert rt.actual_arrival == original.actual_arrival
+    assert rt.flight_leg_date == original.flight_leg_date
+
+def test_roundtrip_diversion():
+    raw = """
+    DIV
+    SD200/30.CVBNM.MAN
+    EA1125 STN
+    DR71 PX112/3
+    SI BAD WEATHER
+    """
+    original = parse_msg(raw)
+    rt = roundtrip(raw)
+    assert rt.message_type == "DIV"
+    assert rt.estimated_arrival == original.estimated_arrival
+    assert rt.diversion_reason == original.diversion_reason
+    assert rt.passenger_info.total == original.passenger_info.total
+
+def test_roundtrip_multi_leg():
+    raw = """
+    MVT
+    BA100/27.PPVMU.LHR
+    AD1200/1210 EA1300 CDG
+    AD1400/1415 EA1600 FRA
+    """
+    original = parse_msg(raw)
+    rt = roundtrip(raw)
+    assert len(rt.legs) == len(original.legs)
+    assert rt.legs[0].actual_departure == original.legs[0].actual_departure
+    assert rt.legs[0].destination == original.legs[0].destination
+    assert rt.legs[1].actual_departure == original.legs[1].actual_departure
+    assert rt.legs[1].destination == original.legs[1].destination
+
+def test_roundtrip_flight_ops():
+    raw = """
+    MVT
+    SD200/22.PMDFG.CDG
+    CRT0930
+    TOF5000
+    TOW70000
+    ZFW60000
+    """
+    original = parse_msg(raw)
+    rt = roundtrip(raw)
+    assert rt.crew_report_time == original.crew_report_time
+    assert rt.takeoff_fuel == original.takeoff_fuel
+    assert rt.takeoff_weight == original.takeoff_weight
+    assert rt.zero_fuel_weight == original.zero_fuel_weight
+
+def test_roundtrip_cor_flag():
+    raw = """
+    MVT COR
+    SD200/21.PMDFG.CDG
+    AD1100/1115
+    """
+    original = parse_msg(raw)
+    rt = roundtrip(raw)
+    assert rt.is_correction is True
+    assert rt.actual_departure == original.actual_departure
+
+def test_to_mvt_output():
+    """Verify the raw MVT string format is correct."""
+    parser = MVTParser()
+    msg = parser.parse("""
+    MVT
+    BA100/27.PPVMU.LHR
+    AD1200/1210 EA1300 CDG
+    DL72/0015
+    PX145/12
+    SI DEICING
+    """)
+    mvt = msg.to_mvt()
+    assert mvt.startswith("MVT")
+    assert "BA100/27.PPVMU.LHR" in mvt
+    assert "AD1200/1210" in mvt
+    assert "EA1300" in mvt
+    assert "DL72/0015" in mvt
+    assert "PX145/12" in mvt
+    assert "SI DEICING" in mvt
+
+# --- reclearance_airport disambiguation ---
+
+def test_reclearance_with_airport():
+    raw = """
+    MVT
+    BA100/27.PPVMU.LHR
+    AD1200/1210 EA1300 CDG
+    RC0945 LHR
+    """
+    msg = parse_msg(raw)
+    assert msg.reclearance == "0945"
+    assert msg.reclearance_airport == "LHR"
+    # destination_airport comes from EA context, not RC
+    assert msg.destination_airport == "CDG"
+
+def test_reclearance_without_airport():
+    raw = """
+    MVT
+    SD200/22.PMDFG.CDG
+    RC1234
+    """
+    msg = parse_msg(raw)
+    assert msg.reclearance == "1234"
+    assert msg.reclearance_airport is None
+
+def test_roundtrip_reclearance_with_airport():
+    raw = """
+    MVT
+    BA100/27.PPVMU.LHR
+    AD1200/1210 EA1300 CDG
+    RC0945 LHR
+    """
+    original = parse_msg(raw)
+    rt = MVTParser().parse(original.to_mvt())
+    assert rt.reclearance == original.reclearance
+    assert rt.reclearance_airport == original.reclearance_airport
+    assert rt.destination_airport == original.destination_airport

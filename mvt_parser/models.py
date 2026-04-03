@@ -66,6 +66,7 @@ class MVTMessage:
 
     # Flight operations
     reclearance: Optional[str] = None
+    reclearance_airport: Optional[str] = None
     destination_airport: Optional[str] = None
     flight_leg_date: Optional[str] = None
     crew_report_time: Optional[str] = None
@@ -80,6 +81,107 @@ class MVTMessage:
 
     # Unknown/unhandled lines
     unknown_lines: List[str] = field(default_factory=list)
+
+    def to_mvt(self) -> str:
+        """Serialize back to MVT wire format. The result is parseable by MVTParser."""
+        lines = []
+
+        # Header
+        flag = " COR" if self.is_correction else (" REV" if self.is_revision else "")
+        lines.append(f"{self.message_type}{flag}")
+
+        # Flight line
+        flight = f"{self.flight_number}/{self.scheduled_day}"
+        if self.aircraft_registration:
+            flight += f".{self.aircraft_registration}"
+        flight += f".{self.airport_of_movement}"
+        lines.append(flight)
+
+        # Movement lines — use legs if populated, otherwise primary fields
+        if self.legs:
+            for leg in self.legs:
+                tokens = []
+                if leg.actual_departure:
+                    tokens.append(f"AD{leg.actual_departure}")
+                if leg.actual_arrival:
+                    tokens.append(f"AA{leg.actual_arrival}")
+                if leg.estimated_departure:
+                    tokens.append(f"ED{leg.estimated_departure}")
+                if leg.estimated_arrival:
+                    tokens.append(f"EA{leg.estimated_arrival}")
+                if leg.destination:
+                    tokens.append(leg.destination)
+                if tokens:
+                    lines.append(" ".join(tokens))
+        else:
+            tokens = []
+            if self.actual_departure:
+                tokens.append(f"AD{self.actual_departure}")
+            if self.actual_arrival:
+                tokens.append(f"AA{self.actual_arrival}")
+            if self.estimated_departure:
+                tokens.append(f"ED{self.estimated_departure}")
+            if self.estimated_arrival:
+                tokens.append(f"EA{self.estimated_arrival}")
+                if self.destination_airport:
+                    tokens.append(self.destination_airport)
+            if tokens:
+                lines.append(" ".join(tokens))
+
+        if self.estimated_onblock:
+            lines.append(f"EB{self.estimated_onblock}")
+
+        # Delays
+        for delay in self.delays:
+            parts = delay.reason_codes + delay.durations
+            lines.append(f"DL{'/'.join(parts)}")
+
+        # FR — passenger info attached when no diversion reason
+        if self.return_from_airborne:
+            line = f"FR{self.return_from_airborne}"
+            if self.passenger_info and not self.diversion_reason:
+                line += f" PX{self.passenger_info.total}"
+                if self.passenger_info.infants is not None:
+                    line += f"/{self.passenger_info.infants}"
+            lines.append(line)
+
+        # DR — passenger info attached on same line
+        if self.diversion_reason:
+            line = f"DR{self.diversion_reason}"
+            if self.passenger_info:
+                line += f" PX{self.passenger_info.total}"
+                if self.passenger_info.infants is not None:
+                    line += f"/{self.passenger_info.infants}"
+            lines.append(line)
+        elif self.passenger_info and not self.return_from_airborne:
+            pax = f"PX{self.passenger_info.total}"
+            if self.passenger_info.infants is not None:
+                pax += f"/{self.passenger_info.infants}"
+            lines.append(pax)
+
+        if self.next_info:
+            lines.append(f"NI{self.next_info}")
+        if self.reclearance:
+            rc = f"RC{self.reclearance}"
+            if self.reclearance_airport:
+                rc += f" {self.reclearance_airport}"
+            lines.append(rc)
+        if self.flight_leg_date:
+            lines.append(f"FLD{self.flight_leg_date}")
+        if self.crew_report_time:
+            lines.append(f"CRT{self.crew_report_time}")
+        if self.movement_after_pushback:
+            lines.append(f"MAP{self.movement_after_pushback}")
+        if self.takeoff_fuel is not None:
+            lines.append(f"TOF{self.takeoff_fuel}")
+        if self.takeoff_weight is not None:
+            lines.append(f"TOW{self.takeoff_weight}")
+        if self.zero_fuel_weight is not None:
+            lines.append(f"ZFW{self.zero_fuel_weight}")
+        for si in self.supplementary_info:
+            lines.append(f"SI {si}")
+
+        return "\n".join(lines)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -131,7 +233,10 @@ class MVTMessage:
                 pax += f"/{self.passenger_info.infants} infants"
             parts.append(f"  PX: {pax}")
         if self.reclearance:
-            parts.append(f"  RC: {self.reclearance}")
+            rc = f"  RC: {self.reclearance}"
+            if self.reclearance_airport:
+                rc += f" {self.reclearance_airport}"
+            parts.append(rc)
         if self.flight_leg_date:
             parts.append(f"  FLD: {self.flight_leg_date}")
         if self.crew_report_time:

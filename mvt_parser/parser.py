@@ -54,40 +54,51 @@ class MVTParser:
         return msg
 
     def _parse_line(self, line: str, m: MVTMessage):
+        if not self._parse_full_line(line, m):
+            self._parse_tokens(line, m)
+
+    def _parse_full_line(self, line: str, m: MVTMessage) -> bool:
+        """Handle lines where the entire content belongs to one prefix. Returns True if handled."""
         if line.startswith("SI"):
             m.supplementary_info.append(line[2:].strip())
-            return
+            return True
 
         if line.startswith("DR"):
             parts = line[2:].strip().split()
             m.diversion_reason = parts[0] if parts else None
             if len(parts) > 1 and parts[1].startswith("PX"):
                 m.passenger_info = self._parse_passenger(parts[1][2:])
-            return
+            return True
 
         if line.startswith("FR"):
             parts = line[2:].strip().split()
             m.return_from_airborne = self._get_movement(parts[0]) if parts else None
             if len(parts) > 1 and parts[1].startswith("PX"):
                 m.passenger_info = self._parse_passenger(parts[1][2:])
-            return
+            return True
 
         if line.startswith("PX"):
             m.passenger_info = self._parse_passenger(line[2:].strip())
-            return
+            return True
 
         if line.startswith("DL"):
             m.delays.append(self._parse_delay(line[2:].strip()))
-            return
+            return True
 
         if line.startswith("NI"):
             val = line[2:].strip()
             self._validate_time(val, "NI")
             m.next_info = val
-            return
+            return True
 
+        return False
+
+    def _parse_tokens(self, line: str, m: MVTMessage):
+        """Handle space-separated token lines, tracking context for IATA code disambiguation."""
         tokens = line.split()
         current_leg: Optional[FlightLeg] = None
+        last_token_type: Optional[str] = None
+
         for token in tokens:
             if token.startswith("AD"):
                 mt = self._get_movement(token[2:])
@@ -95,6 +106,7 @@ class MVTParser:
                     m.actual_departure = mt
                 current_leg = FlightLeg(actual_departure=mt)
                 m.legs.append(current_leg)
+                last_token_type = "AD"
             elif token.startswith("AA"):
                 mt = self._get_movement(token[2:])
                 if m.actual_arrival is None:
@@ -104,51 +116,67 @@ class MVTParser:
                     m.legs.append(current_leg)
                 else:
                     current_leg.actual_arrival = mt
+                last_token_type = "AA"
             elif token.startswith("ED"):
                 val = token[2:]
                 self._validate_time(val, "ED")
                 m.estimated_departure = val
                 if current_leg:
                     current_leg.estimated_departure = val
+                last_token_type = "ED"
             elif token.startswith("EA"):
                 val = token[2:]
                 self._validate_time(val, "EA")
                 m.estimated_arrival = val
                 if current_leg:
                     current_leg.estimated_arrival = val
+                last_token_type = "EA"
             elif token.startswith("EB"):
                 val = token[2:]
                 self._validate_time(val, "EB")
                 m.estimated_onblock = val
+                last_token_type = "EB"
             elif token.startswith("RC"):
                 m.reclearance = token[2:]
+                last_token_type = "RC"
             elif token.startswith("FLD"):
                 m.flight_leg_date = token[3:]
+                last_token_type = "FLD"
             elif token.startswith("CRT"):
                 m.crew_report_time = token[3:]
+                last_token_type = "CRT"
             elif token.startswith("MAP"):
                 m.movement_after_pushback = token[3:]
+                last_token_type = "MAP"
             elif token.startswith("TOF"):
                 try:
                     m.takeoff_fuel = int(token[3:])
                 except ValueError:
                     raise MVTParseError(f"Invalid takeoff fuel value: {token[3:]!r}")
+                last_token_type = "TOF"
             elif token.startswith("TOW"):
                 try:
                     m.takeoff_weight = int(token[3:])
                 except ValueError:
                     raise MVTParseError(f"Invalid takeoff weight value: {token[3:]!r}")
+                last_token_type = "TOW"
             elif token.startswith("ZFW"):
                 try:
                     m.zero_fuel_weight = int(token[3:])
                 except ValueError:
                     raise MVTParseError(f"Invalid zero fuel weight value: {token[3:]!r}")
+                last_token_type = "ZFW"
             elif _IATA_RE.match(token):
-                m.destination_airport = token
-                if current_leg:
-                    current_leg.destination = token
+                if last_token_type == "RC":
+                    m.reclearance_airport = token
+                else:
+                    m.destination_airport = token
+                    if current_leg:
+                        current_leg.destination = token
+                last_token_type = "IATA"
             else:
                 m.unknown_lines.append(token)
+                last_token_type = None
 
     def _get_movement(self, t: str) -> MovementTime:
         parts = t.split("/")
