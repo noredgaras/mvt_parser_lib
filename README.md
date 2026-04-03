@@ -2,6 +2,58 @@
 
 Python library for parsing IATA MVT flight movement messages.
 
+## What is MVT?
+
+MVT (Movement), MVA (Movement Advice), and DIV (Diversion) are standardised plain-text telegrams exchanged between airlines, airports, and handling agents to communicate real-time flight events.
+
+They are used to:
+- Control punctual and regular operation of all flights
+- Form the basis for aircraft and crew rotation planning
+- Alert operations control centres to diversions and unplanned routing changes
+
+A typical MVT message looks like this:
+
+```
+MVT
+BA100/27.PPVMU.LHR
+AD1200/1210 EA1300 CDG
+DL72/0015
+PX145/12
+SI DEICING
+```
+
+Every message has the same structure:
+1. **Header line** — message type (`MVT`, `MVA`, or `DIV`) with optional `COR` (correction) or `REV` (revision) flag
+2. **Flight line** — flight number, scheduled day, aircraft registration, and airport of movement
+3. **Body lines** — one or more lines carrying movement data using two- or three-letter tokens
+
+### Tokens
+
+| Token | Meaning | Example |
+|-------|---------|---------|
+| `AD` | Actual departure (off-block / airborne) | `AD1200/1210` |
+| `AA` | Actual arrival (touchdown / on-block) | `AA1515/1520` |
+| `EA` | Estimated arrival (touchdown) + airport | `EA1300 CDG` |
+| `ED` | Estimated departure | `ED041630` |
+| `EB` | Estimated on-block time | `EB1320` |
+| `DL` | Delay — reason code(s) and duration(s) | `DL72/0015` |
+| `PX` | Passengers on board / infants | `PX145/12` |
+| `RC` | Reclearance time and airport | `RC1200 LTN` |
+| `DR` | Diversion reason code | `DR71` |
+| `FR` | Forced return from airborne | `FR1215/1235` |
+| `NI` | Next information time (indefinite delay) | `NI052215` |
+| `FLD` | Flight leg date | `FLD16` |
+| `CRT` | Crew report time | `CRT1530` |
+| `MAP` | Movement after pushback | `MAP1015` |
+| `TOF` | Take-off fuel | `TOF6400` |
+| `TOW` | Take-off weight | `TOW63452` |
+| `ZFW` | Zero fuel weight | `ZFW132500` |
+| `SI` | Supplementary free-text information | `SI DEICING` |
+
+All times are UTC in `HHMM` (4-digit) or `DDHHMM` (6-digit) format.
+
+---
+
 ## Install
 
 ```bash
