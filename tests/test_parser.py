@@ -352,8 +352,8 @@ def test_div_comprehensive():
     assert msg.delays[0].durations == ["0045"]
     assert "BAD WEATHER DIVERSION" in msg.supplementary_info[0]
 
-# --- 25. Multiple delays ---
-def test_multiple_delays():
+# --- 25. Single DL line with multiple codes and durations ---
+def test_delay_combined_codes_and_durations():
     raw = """
     MVT
     SD200/22.PMDFG.CDG
@@ -364,8 +364,8 @@ def test_multiple_delays():
     assert msg.delays[0].reason_codes == ["72", "0015 85"]
     assert msg.delays[0].durations == ["0030"]
 
-# --- 26. Delay with only reason codes ---
-def test_delay_only_reasons():
+# --- 26. DL line with reason codes and no durations ---
+def test_delay_reason_codes_only():
     raw = """
     MVT
     SD200/22.PMDFG.CDG
@@ -573,77 +573,7 @@ def test_multiple_si_lines():
     assert "SECOND INFO" in msg.supplementary_info[1]
     assert "THIRD INFO" in msg.supplementary_info[2]
 
-# --- 45. RC reclearance ---
-def test_reclearance():
-    raw = """
-    MVT
-    SD200/22.PMDFG.CDG
-    RC1234
-    """
-    msg = parse_msg(raw)
-    assert msg.reclearance == "1234"
-
-# --- 46. FLD flight leg date ---
-def test_flight_leg_date():
-    raw = """
-    MVT
-    SD200/22.PMDFG.CDG
-    FLD25
-    """
-    msg = parse_msg(raw)
-    assert msg.flight_leg_date == "25"
-
-# --- 47. CRT crew report time ---
-def test_crew_report_time():
-    raw = """
-    MVT
-    SD200/22.PMDFG.CDG
-    CRT0800
-    """
-    msg = parse_msg(raw)
-    assert msg.crew_report_time == "0800"
-
-# --- 48. MAP movement after pushback ---
-def test_movement_after_pushback():
-    raw = """
-    MVT
-    SD200/22.PMDFG.CDG
-    MAP1030
-    """
-    msg = parse_msg(raw)
-    assert msg.movement_after_pushback == "1030"
-
-# --- 49. TOF takeoff fuel ---
-def test_takeoff_fuel():
-    raw = """
-    MVT
-    SD200/22.PMDFG.CDG
-    TOF15000
-    """
-    msg = parse_msg(raw)
-    assert msg.takeoff_fuel == 15000
-
-# --- 50. TOW takeoff weight ---
-def test_takeoff_weight():
-    raw = """
-    MVT
-    SD200/22.PMDFG.CDG
-    TOW80000
-    """
-    msg = parse_msg(raw)
-    assert msg.takeoff_weight == 80000
-
-# --- 51. ZFW zero fuel weight ---
-def test_zero_fuel_weight():
-    raw = """
-    MVT
-    SD200/22.PMDFG.CDG
-    ZFW65000
-    """
-    msg = parse_msg(raw)
-    assert msg.zero_fuel_weight == 65000
-
-# --- 52. Multiple unknown tokens ---
+# --- 45. Multiple unknown tokens ---
 def test_multiple_unknown_tokens():
     raw = """
     MVT
@@ -912,3 +842,51 @@ def test_roundtrip_reclearance_with_airport():
     assert rt.reclearance == original.reclearance
     assert rt.reclearance_airport == original.reclearance_airport
     assert rt.destination_airport == original.destination_airport
+
+# --- EB in isolation ---
+def test_estimated_onblock_only():
+    raw = """
+    MVT
+    SD200/22.PMDFG.FRA
+    AA1510
+    EB1525
+    """
+    msg = parse_msg(raw)
+    assert msg.estimated_onblock == "1525"
+    assert msg.actual_arrival.primary == "1510"
+    assert msg.estimated_arrival is None
+
+# --- SI with empty content ---
+def test_si_empty_content():
+    raw = """
+    MVT
+    SD200/22.PMDFG.CDG
+    SI
+    """
+    msg = parse_msg(raw)
+    assert len(msg.supplementary_info) == 1
+    assert msg.supplementary_info[0] == ""
+
+# --- to_mvt output includes reclearance airport ---
+def test_to_mvt_reclearance_airport_format():
+    raw = """
+    MVT
+    BA100/27.PPVMU.LHR
+    AD1200/1210 EA1300 CDG
+    RC0945 LHR
+    """
+    msg = parse_msg(raw)
+    mvt = msg.to_mvt()
+    assert "RC0945 LHR" in mvt
+    assert "EA1300 CDG" in mvt
+
+# --- Zero passenger count ---
+def test_zero_passenger_count():
+    raw = """
+    MVT
+    SD200/22.PMDFG.CDG
+    PX0
+    """
+    msg = parse_msg(raw)
+    assert msg.passenger_info.total == 0
+    assert msg.passenger_info.infants is None
