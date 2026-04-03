@@ -24,8 +24,11 @@ jobs:
       - name: Install package
         run: pip install -e .
 
-      - name: Install pytest
-        run: pip install pytest
+      - name: Install pytest and ruff
+        run: pip install pytest ruff
+
+      - name: Lint
+        run: ruff check mvt_parser/
 
       - name: Run tests
         run: pytest tests/ -v
