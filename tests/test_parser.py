@@ -890,3 +890,168 @@ def test_zero_passenger_count():
     msg = parse_msg(raw)
     assert msg.passenger_info.total == 0
     assert msg.passenger_info.infants is None
+
+# --- EO: Estimated Take-Off ---
+def test_estimated_takeoff():
+    raw = """
+    MVT
+    SD200/22.PMDFG.CDG
+    AD1100/1115 EO1120 EA1500 FRA
+    """
+    msg = parse_msg(raw)
+    assert msg.estimated_takeoff == "1120"
+    assert msg.actual_departure.primary == "1100"
+    assert msg.estimated_arrival == "1500"
+
+def test_invalid_eo_time():
+    raw = """
+    MVT
+    SD200/22.PMDFG.CDG
+    EO12345
+    """
+    parser = MVTParser()
+    with pytest.raises(MVTParseError, match="Invalid time format in EO"):
+        parser.parse(raw)
+
+def test_roundtrip_estimated_takeoff():
+    raw = """
+    MVT
+    SD200/22.PMDFG.CDG
+    AD1100/1115 EA1500 FRA
+    EO1120
+    """
+    original = parse_msg(raw)
+    rt = MVTParser().parse(original.to_mvt())
+    assert rt.estimated_takeoff == original.estimated_takeoff
+
+# --- RR: Return to Ramp ---
+def test_return_to_ramp():
+    raw = """
+    MVT
+    SD200/22.PMDFG.CDG
+    RR1130/1145
+    SI TECHNICAL ISSUE
+    """
+    msg = parse_msg(raw)
+    assert msg.return_to_ramp.primary == "1130"
+    assert msg.return_to_ramp.secondary == "1145"
+    assert "TECHNICAL ISSUE" in msg.supplementary_info[0]
+
+def test_roundtrip_return_to_ramp():
+    raw = """
+    MVT
+    SD200/22.PMDFG.CDG
+    RR1130/1145
+    """
+    original = parse_msg(raw)
+    rt = MVTParser().parse(original.to_mvt())
+    assert rt.return_to_ramp == original.return_to_ramp
+
+# --- DLA: Sub Delay Code ---
+def test_sub_delay_code():
+    raw = """
+    MVT
+    SD200/22.PMDFG.CDG
+    DL93/0030
+    DLA93A
+    """
+    msg = parse_msg(raw)
+    assert msg.delays[0].reason_codes == ["93"]
+    assert msg.sub_delay_code == "93A"
+
+def test_roundtrip_sub_delay_code():
+    raw = """
+    MVT
+    SD200/22.PMDFG.CDG
+    DL93/0030
+    DLA93A
+    """
+    original = parse_msg(raw)
+    rt = MVTParser().parse(original.to_mvt())
+    assert rt.sub_delay_code == original.sub_delay_code
+
+# --- EDL: Extra Delay Information ---
+def test_extra_delay_info():
+    raw = """
+    MVT
+    SD200/22.PMDFG.CDG
+    DL72/0020
+    EDL AWAITING CREW
+    """
+    msg = parse_msg(raw)
+    assert msg.extra_delay_info == "AWAITING CREW"
+
+def test_roundtrip_extra_delay_info():
+    raw = """
+    MVT
+    SD200/22.PMDFG.CDG
+    DL72/0020
+    EDL AWAITING CREW
+    """
+    original = parse_msg(raw)
+    rt = MVTParser().parse(original.to_mvt())
+    assert rt.extra_delay_info == original.extra_delay_info
+
+# --- CRT and MAP time validation ---
+def test_invalid_crt_time():
+    raw = """
+    MVT
+    SD200/22.PMDFG.CDG
+    CRT123
+    """
+    parser = MVTParser()
+    with pytest.raises(MVTParseError, match="Invalid time format in CRT"):
+        parser.parse(raw)
+
+def test_invalid_map_time():
+    raw = """
+    MVT
+    SD200/22.PMDFG.CDG
+    MAP12345
+    """
+    parser = MVTParser()
+    with pytest.raises(MVTParseError, match="Invalid time format in MAP"):
+        parser.parse(raw)
+
+# --- FLD day validation ---
+def test_invalid_fld_day_zero():
+    raw = """
+    MVT
+    SD200/22.PMDFG.CDG
+    FLD00
+    """
+    parser = MVTParser()
+    with pytest.raises(MVTParseError, match="Invalid flight leg date"):
+        parser.parse(raw)
+
+def test_invalid_fld_day_out_of_range():
+    raw = """
+    MVT
+    SD200/22.PMDFG.CDG
+    FLD32
+    """
+    parser = MVTParser()
+    with pytest.raises(MVTParseError, match="Invalid flight leg date"):
+        parser.parse(raw)
+
+def test_invalid_fld_non_numeric():
+    raw = """
+    MVT
+    SD200/22.PMDFG.CDG
+    FLDXX
+    """
+    parser = MVTParser()
+    with pytest.raises(MVTParseError, match="Invalid flight leg date"):
+        parser.parse(raw)
+
+# --- EB stored in FlightLeg ---
+def test_eb_stored_in_flight_leg():
+    raw = """
+    MVT
+    BA100/27.PPVMU.LHR
+    AA1515/1520 EB1530
+    """
+    msg = parse_msg(raw)
+    assert msg.estimated_onblock == "1530"
+    assert len(msg.legs) == 1
+    assert msg.legs[0].estimated_onblock == "1530"

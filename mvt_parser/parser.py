@@ -77,12 +77,25 @@ class MVTParser:
                 m.passenger_info = self._parse_passenger(parts[1][2:])
             return True
 
+        if line.startswith("RR"):
+            parts = line[2:].strip().split()
+            m.return_to_ramp = self._get_movement(parts[0]) if parts else None
+            return True
+
         if line.startswith("PX"):
             m.passenger_info = self._parse_passenger(line[2:].strip())
             return True
 
+        if line.startswith("DLA"):
+            m.sub_delay_code = line[3:].strip()
+            return True
+
         if line.startswith("DL"):
             m.delays.append(self._parse_delay(line[2:].strip()))
+            return True
+
+        if line.startswith("EDL"):
+            m.extra_delay_info = line[3:].strip()
             return True
 
         if line.startswith("NI"):
@@ -131,22 +144,42 @@ class MVTParser:
                 if current_leg:
                     current_leg.estimated_arrival = val
                 last_token_type = "EA"
+            elif token.startswith("EO"):
+                val = token[2:]
+                self._validate_time(val, "EO")
+                m.estimated_takeoff = val
+                if current_leg:
+                    current_leg.estimated_takeoff = val
+                last_token_type = "EO"
             elif token.startswith("EB"):
                 val = token[2:]
                 self._validate_time(val, "EB")
                 m.estimated_onblock = val
+                if current_leg:
+                    current_leg.estimated_onblock = val
                 last_token_type = "EB"
             elif token.startswith("RC"):
                 m.reclearance = token[2:]
                 last_token_type = "RC"
             elif token.startswith("FLD"):
-                m.flight_leg_date = token[3:]
+                val = token[3:]
+                try:
+                    day = int(val)
+                except ValueError:
+                    raise MVTParseError(f"Invalid flight leg date: {val!r}")
+                if not 1 <= day <= 31:
+                    raise MVTParseError(f"Invalid flight leg date: {val!r}")
+                m.flight_leg_date = val
                 last_token_type = "FLD"
             elif token.startswith("CRT"):
-                m.crew_report_time = token[3:]
+                val = token[3:]
+                self._validate_time(val, "CRT")
+                m.crew_report_time = val
                 last_token_type = "CRT"
             elif token.startswith("MAP"):
-                m.movement_after_pushback = token[3:]
+                val = token[3:]
+                self._validate_time(val, "MAP")
+                m.movement_after_pushback = val
                 last_token_type = "MAP"
             elif token.startswith("TOF"):
                 try:

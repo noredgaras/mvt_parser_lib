@@ -30,6 +30,8 @@ class FlightLeg:
     actual_arrival: Optional[MovementTime] = None
     estimated_departure: Optional[str] = None
     estimated_arrival: Optional[str] = None
+    estimated_onblock: Optional[str] = None
+    estimated_takeoff: Optional[str] = None
     destination: Optional[str] = None
 
 
@@ -58,6 +60,8 @@ class MVTMessage:
 
     # Delays & supplementary
     delays: List[Delay] = field(default_factory=list)
+    sub_delay_code: Optional[str] = None
+    extra_delay_info: Optional[str] = None
     next_info: Optional[str] = None
     supplementary_info: List[str] = field(default_factory=list)
 
@@ -78,6 +82,8 @@ class MVTMessage:
     # Special cases
     diversion_reason: Optional[str] = None
     return_from_airborne: Optional[MovementTime] = None
+    return_to_ramp: Optional[MovementTime] = None
+    estimated_takeoff: Optional[str] = None
 
     # Unknown/unhandled lines
     unknown_lines: List[str] = field(default_factory=list)
@@ -109,6 +115,10 @@ class MVTMessage:
                     tokens.append(f"ED{leg.estimated_departure}")
                 if leg.estimated_arrival:
                     tokens.append(f"EA{leg.estimated_arrival}")
+                if leg.estimated_onblock:
+                    tokens.append(f"EB{leg.estimated_onblock}")
+                if leg.estimated_takeoff:
+                    tokens.append(f"EO{leg.estimated_takeoff}")
                 if leg.destination:
                     tokens.append(leg.destination)
                 if tokens:
@@ -130,11 +140,21 @@ class MVTMessage:
 
         if self.estimated_onblock:
             lines.append(f"EB{self.estimated_onblock}")
+        if self.estimated_takeoff:
+            lines.append(f"EO{self.estimated_takeoff}")
 
         # Delays
         for delay in self.delays:
             parts = delay.reason_codes + delay.durations
             lines.append(f"DL{'/'.join(parts)}")
+        if self.sub_delay_code:
+            lines.append(f"DLA{self.sub_delay_code}")
+        if self.extra_delay_info:
+            lines.append(f"EDL{self.extra_delay_info}")
+
+        # RR — return to ramp
+        if self.return_to_ramp:
+            lines.append(f"RR{self.return_to_ramp}")
 
         # FR — passenger info attached when no diversion reason
         if self.return_from_airborne:
@@ -249,10 +269,18 @@ class MVTMessage:
             parts.append(f"  TOW: {self.takeoff_weight}")
         if self.zero_fuel_weight is not None:
             parts.append(f"  ZFW: {self.zero_fuel_weight}")
+        if self.estimated_takeoff:
+            parts.append(f"  EO: {self.estimated_takeoff}")
         if self.diversion_reason:
             parts.append(f"  DR: {self.diversion_reason}")
         if self.return_from_airborne:
             parts.append(f"  FR: {self.return_from_airborne}")
+        if self.return_to_ramp:
+            parts.append(f"  RR: {self.return_to_ramp}")
+        if self.sub_delay_code:
+            parts.append(f"  DLA: {self.sub_delay_code}")
+        if self.extra_delay_info:
+            parts.append(f"  EDL: {self.extra_delay_info}")
         if self.next_info:
             parts.append(f"  NI: {self.next_info}")
         for si in self.supplementary_info:
