@@ -25,19 +25,31 @@ Recommended: use a virtual environment:
 # Navigate to project folder
 cd mvt_parser_lib
 
-# Create a virtual environment (WSL/Linux/macOS)
-python3 -m venv venv
-source venv/bin/activate
+# Create a virtual environment
+python -m venv venv
 
-# Or Windows
-# python -m venv venv
-# venv\Scripts\activate
+# Activate the virtual environment
+# On Windows:
+venv\Scripts\activate
+# On macOS/Linux:
+# source venv/bin/activate
 
 # Install locally in editable mode
-pip install -e .
+python -m pip install -e .
+
+# For development/testing, install pytest
+python -m pip install pytest
 ```
 
 ---
+
+## Testing
+
+Run the test suite:
+
+```bash
+python -m pytest tests/
+```
 
 ## Usage
 
