@@ -48,6 +48,10 @@ Every message has the same structure:
 | `TOF` | Take-off fuel | `TOF6400` |
 | `TOW` | Take-off weight | `TOW63452` |
 | `ZFW` | Zero fuel weight | `ZFW132500` |
+| `EO` | Estimated take-off time | `EO1120` |
+| `RR` | Return to ramp | `RR1130/1145` |
+| `DLA` | Sub delay code | `DLA93A` |
+| `EDL` | Extra delay information | `EDL AWAITING CREW` |
 | `SI` | Supplementary free-text information | `SI DEICING` |
 
 All times are UTC in `HHMM` (4-digit) or `DDHHMM` (6-digit) format.
@@ -120,6 +124,10 @@ msg.zero_fuel_weight        # 60000
 
 msg.diversion_reason        # "71"
 msg.return_from_airborne    # MovementTime(primary="1400", secondary="1420")
+msg.return_to_ramp          # MovementTime(primary="1130", secondary="1145")
+msg.estimated_takeoff       # "1120"
+msg.sub_delay_code          # "93A"
+msg.extra_delay_info        # "AWAITING CREW"
 msg.supplementary_info      # ["DEICING"]
 msg.next_info               # "221150"
 ```
