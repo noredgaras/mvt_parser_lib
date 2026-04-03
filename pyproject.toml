@@ -9,7 +9,8 @@ description = "Python library to parse OAG/IATA MVT flight movement messages"
 readme = "README.md"
 requires-python = ">=3.9"
 authors = [{ name = "Edgaras Norvaisa" }]
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 keywords = ["aviation", "flights", "mvt", "parser", "iata", "oag"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -19,7 +20,7 @@ classifiers = [
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
-    "License :: OSI Approved :: MIT License"
+    "Programming Language :: Python :: 3.12",
 ]
 
 [project.urls]

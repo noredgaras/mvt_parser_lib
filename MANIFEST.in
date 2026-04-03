@@ -1,0 +1,9 @@
+prune venv
+prune .venv
+prune .git
+prune .github
+prune .claude
+prune tests
+prune examples
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
