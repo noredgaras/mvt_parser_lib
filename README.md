@@ -109,6 +109,10 @@ except MVTParseError as e:
     print(f"Invalid message: {e}")
 ```
 
+## References
+
+- [IATA MVT/MVA/DIV Message Types and Examples](https://www.oag.com/hubfs/Inbound-Services/OAG-MVT-MVA-DIV-Message-Types-and-Examples.pdf)
+
 ## License
 
 MIT
